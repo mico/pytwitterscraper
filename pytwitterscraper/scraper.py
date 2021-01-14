@@ -10,6 +10,7 @@ import os
 from requests_html import HTMLSession
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from .scraperresult import TwitterScraperResultProfile, TwitterScraperTrends, TwitterSearchKeywords, TwitterScraperTweets
+from urllib.parse import quote
 
 class TwitterScraper:
 	def __init__(self, proxy_enable=False, proxy_http=None, proxy_https=None) :
@@ -263,6 +264,28 @@ class TwitterScraper:
 		return TwitterScraperTrends(
 			twitter_data=name_trend
 		)
+
+	def get_tweet_comments_page(self, conversation_id: str = None, cursor: str = None, data: dict = {}):
+		resp = self.__requestsdata(
+			url=self.url,
+			target=f"i/api/2/timeline/conversation/{conversation_id}.json?tweet_mode=extended&count=10{cursor and '&cursor=' + quote(cursor) or ''}"
+		)
+
+		if resp.status_code >= 400:
+			raise Exception("ID Tweet Not Found!")
+
+		data.update(resp.json()["globalObjects"]["tweets"])
+
+		del data["%s" % conversation_id]
+
+		if 'operation' in resp.json()['timeline']['instructions'][0]['addEntries']['entries'][-1]['content']:
+			new_cursor = \
+			resp.json()['timeline']['instructions'][0]['addEntries']['entries'][-1]['content']['operation']['cursor'][
+				'value']
+			print(f"cursor: {new_cursor}")
+			return self.get_tweet_comments_page(conversation_id, new_cursor, data)
+		else:
+			return data
 
 	def get_tweetcomments(self,id: str=None) :
 		i = 0
